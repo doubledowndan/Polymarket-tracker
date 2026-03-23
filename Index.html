@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Polymarket Wallet Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --green: #00ff87;
+      --red: #ff3b5c;
+      --gold: #ffd93d;
+      --bg: #060912;
+      --surface: #0d1525;
+      --border: #1a2540;
+      --text: #c8d8f0;
+      --muted: #4a6080;
+    }
+
+```
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Space Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,135,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,135,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Radial glow */
+body::after {
+  content: '';
+  position: fixed;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 600px;
+  background: radial-gradient(ellipse, rgba(0,255,135,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass {
+  background: rgba(13, 21, 37, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+.profit { color: var(--green); }
+.loss { color: var(--red); }
+.neutral { color: var(--gold); }
+
+/* Ticker tape */
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-wrap { overflow: hidden; white-space: nowrap; }
+.ticker-inner { display: inline-flex; animation: ticker 30s linear infinite; }
+.ticker-inner:hover { animation-play-state: paused; }
+
+/* Pulse dot */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+.pulse-dot { animation: pulse 2s ease-in-out infinite; }
+
+/* Slide in animation */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.slide-in { animation: slideIn 0.3s ease forwards; }
+
+/* Glow button */
+.glow-btn {
+  background: var(--green);
+  color: #000;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  transition: all 0.2s;
+  box-shadow: 0 0 20px rgba(0,255,135,0.3);
+}
+.glow-btn:hover {
+  background: #00cc6a;
+  box-shadow: 0 0 30px rgba(0,255,135,0.5);
+  transform: translateY(-1px);
+}
+
+/* Rank badge */
+.rank-1 { color: #ffd93d; text-shadow: 0 0 12px rgba(255,217,61,0.5); }
+.rank-2 { color: #c0c0c0; text-shadow: 0 0 8px rgba(192,192,192,0.3); }
+.rank-3 { color: #cd7f32; text-shadow: 0 0 8px rgba(205,127,50,0.3); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Progress bar */
+.win-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.win-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), #00cc6a);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+  box-shadow: 0 0 6px rgba(0,255,135,0.4);
+}
+
+/* Tab */
+.tab-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.tab-btn.active {
+  background: rgba(0,255,135,0.1);
+  border-color: rgba(0,255,135,0.3);
+  color: var(--green);
+}
+.tab-btn:not(.active) {
+  color: var(--muted);
+}
+.tab-btn:not(.active):hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.input-field {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input-field:focus { border-color: var(--green); }
+.input-field::placeholder { color: var(--muted); }
+
+.wallet-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.wallet-row:hover { background: rgba(0,255,135,0.03); }
+
+.position-card {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  transition: border-color 0.2s;
+}
+.position-card:hover { border-color: rgba(0,255,135,0.2); }
+
+/* Syne for headings */
+h1, h2, h3, .syne { font-family: 'Syne', sans-serif; }
+
+@keyframes scanline {
+  0% { top: -10%; }
+  100% { top: 110%; }
+}
+.scanline {
+  position: fixed;
+  left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,135,0.08), transparent);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  z-index: 999;
+  animation: slideIn 0.3s ease;
+}
+.toast.success { background: rgba(0,255,135,0.1); border: 1px solid rgba(0,255,135,0.3); color: var(--green); }
+.toast.error { background: rgba(255,59,92,0.1); border: 1px solid rgba(255,59,92,0.3); color: var(--red); }
+
+.loading-dots::after {
+  content: '';
+  animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+}
+```
+
+  </style>
+</head>
+<body>
+  <div class="scanline"></div>
+
+  <!-- Header -->
+
+  <header class="relative z-10 border-b" style="border-color: var(--border);">
+    <!-- Ticker -->
+    <div class="ticker-wrap py-2 text-xs" style="background: rgba(0,255,135,0.05); border-bottom: 1px solid var(--border);">
+      <div class="ticker-inner" id="tickerContent">
+        <span class="px-8 text-xs" style="color: var(--muted); font-size: 10px;">
+          ◈ POLYMARKET WALLET TRACKER &nbsp;·&nbsp; TRACK WINNING WALLETS &nbsp;·&nbsp; REAL-TIME PNL &nbsp;·&nbsp; WIN RATE ANALYSIS &nbsp;·&nbsp; POSITION MONITORING &nbsp;&nbsp;&nbsp;&nbsp;
+          ◈ POLYMARKET WALLET TRACKER &nbsp;·&nbsp; TRACK WINNING WALLETS &nbsp;·&nbsp; REAL-TIME PNL &nbsp;·&nbsp; WIN RATE ANALYSIS &nbsp;·&nbsp; POSITION MONITORING &nbsp;&nbsp;&nbsp;&nbsp;
+        </span>
+      </div>
+    </div>
+
+```
+<div class="relative z-10 flex items-center justify-between px-8 py-5">
+  <div class="flex items-center gap-4">
+    <div class="w-8 h-8 rounded flex items-center justify-center" style="background: var(--green);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+        <polyline points="16 7 22 7 22 13"></polyline>
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-lg font-bold leading-none" style="letter-spacing: -0.02em;">WALLET TRACKER</h1>
+      <p class="text-xs mt-0.5" style="color: var(--muted); letter-spacing: 0.1em;">POLYMARKET · SMART MONEY</p>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-6">
+    <!-- Live indicator -->
+    <div class="flex items-center gap-2 text-xs" style="color: var(--muted);">
+      <span class="pulse-dot w-2 h-2 rounded-full inline-block" style="background: var(--green);"></span>
+      <span style="letter-spacing: 0.08em;">LIVE</span>
+    </div>
+    <!-- Summary stats -->
+    <div id="headerStats" class="hidden md:flex items-center gap-6 text-xs" style="color: var(--muted);">
+      <span>WALLETS: <span class="profit" id="hdrWallets">0</span></span>
+      <span>TOTAL P&L: <span id="hdrPnl">$0.00</span></span>
+      <span>AVG WIN RATE: <span id="hdrWinRate">0%</span></span>
+    </div>
+    <button onclick="openAddModal()" class="glow-btn px-4 py-2 rounded text-sm">+ ADD WALLET</button>
+  </div>
+</div>
+```
+
+  </header>
+
+  <!-- Main Content -->
+
+  <main class="relative z-10 max-w-7xl mx-auto px-4 md:px-8 py-8">
+
+```
+<!-- Tabs -->
+<div class="flex items-center gap-2 mb-6">
+  <button class="tab-btn active" onclick="switchTab('leaderboard', this)">⚡ Leaderboard</button>
+  <button class="tab-btn" onclick="switchTab('positions', this)">📊 Positions</button>
+  <button class="tab-btn" onclick="switchTab('add', this)">＋ Track Wallet</button>
+</div>
+
+<!-- ═══ LEADERBOARD TAB ═══════════════════════════════════════════════ -->
+<div id="tab-leaderboard" class="tab-panel">
+
+  <!-- Stats bar -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" id="summaryCards">
+    <div class="glass rounded-lg p-4">
+      <p class="text-xs mb-1" style="color: var(--muted); letter-spacing: 0.1em;">WALLETS TRACKED</p>
+      <p class="text-2xl font-bold syne profit" id="sumWallets">—</p>
+    </div>
+    <div class="glass rounded-lg p-4">
+      <p class="text-xs mb-1" style="color: var(--muted); letter-spacing: 0.1em;">COMBINED P&L</p>
+      <p class="text-2xl font-bold syne" id="sumPnl">—</p>
+    </div>
+    <div class="glass rounded-lg p-4">
+      <p class="text-xs mb-1" style="color: var(--muted); letter-spacing: 0.1em;">AVG WIN RATE</p>
+      <p class="text-2xl font-bold syne neutral" id="sumWinRate">—</p>
+    </div>
+    <div class="glass rounded-lg p-4">
+      <p class="text-xs mb-1" style="color: var(--muted); letter-spacing: 0.1em;">TOP WALLET P&L</p>
+      <p class="text-2xl font-bold syne profit" id="sumTop">—</p>
+    </div>
+  </div>
+
+  <!-- Leaderboard table -->
+  <div class="glass rounded-lg overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3" style="border-bottom: 1px solid var(--border);">
+      <h2 class="text-xs font-bold" style="letter-spacing: 0.15em; color: var(--muted);">WALLET LEADERBOARD</h2>
+      <button onclick="refreshAll()" class="text-xs px-3 py-1 rounded" style="border: 1px solid var(--border); color: var(--muted);">↻ REFRESH ALL</button>
+    </div>
+
+    <!-- Table Header -->
+    <div class="hidden md:grid text-xs px-5 py-2" style="color: var(--muted); grid-template-columns: 40px 1fr 120px 100px 100px 120px 80px; letter-spacing: 0.08em; border-bottom: 1px solid var(--border);">
+      <span>#</span>
+      <span>WALLET</span>
+      <span class="text-right">P&L (USDC)</span>
+      <span class="text-right">WIN RATE</span>
+      <span class="text-right">TRADES</span>
+      <span class="text-right">VOLUME</span>
+      <span class="text-right">ACTIONS</span>
+    </div>
+
+    <div id="leaderboardBody">
+      <div class="py-12 text-center text-xs" style="color: var(--muted);">
+        <p class="text-3xl mb-3">🎯</p>
+        <p style="letter-spacing: 0.1em;">NO WALLETS TRACKED YET</p>
+        <p class="mt-1">Add a wallet to start tracking smart money</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ POSITIONS TAB ════════════════════════════════════════════════ -->
+<div id="tab-positions" class="tab-panel hidden">
+  <div class="glass rounded-lg overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3" style="border-bottom: 1px solid var(--border);">
+      <h2 class="text-xs font-bold" style="letter-spacing: 0.15em; color: var(--muted);">OPEN POSITIONS</h2>
+      <select id="walletFilter" onchange="loadPositions()" class="input-field text-xs py-1 px-2">
+        <option value="">All Wallets</option>
+      </select>
+    </div>
+    <div id="positionsBody" class="p-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div class="col-span-full py-8 text-center text-xs" style="color: var(--muted);">Select a wallet or load all positions</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD WALLET TAB ════════════════════════════════════════════════ -->
+<div id="tab-add" class="tab-panel hidden">
+  <div class="max-w-xl">
+    <div class="glass rounded-lg p-6">
+      <h2 class="syne text-lg font-bold mb-1">Track a Wallet</h2>
+      <p class="text-xs mb-6" style="color: var(--muted);">Enter any Ethereum address active on Polymarket to track their positions and PnL.</p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs mb-2" style="color: var(--muted); letter-spacing: 0.1em;">WALLET ADDRESS *</label>
+          <input id="addAddress" type="text" class="input-field w-full" placeholder="0x..." />
+        </div>
+        <div>
+          <label class="block text-xs mb-2" style="color: var(--muted); letter-spacing: 0.1em;">LABEL (OPTIONAL)</label>
+          <input id="addLabel" type="text" class="input-field w-full" placeholder="e.g. Whale #1, Smart Bettor..." />
+        </div>
+        <button onclick="addWallet()" class="glow-btn w-full py-3 rounded text-sm">
+          START TRACKING →
+        </button>
+      </div>
+
+      <div class="mt-6 p-4 rounded" style="background: rgba(0,255,135,0.05); border: 1px solid rgba(0,255,135,0.1);">
+        <p class="text-xs mb-2" style="color: var(--green); letter-spacing: 0.1em;">💡 TIPS</p>
+        <ul class="text-xs space-y-1.5" style="color: var(--muted);">
+          <li>· Find winning wallets by browsing Polymarket's top traders</li>
+          <li>· Addresses are checksummed automatically</li>
+          <li>· Data is fetched from Polymarket's CLOB & Gamma APIs</li>
+          <li>· Refresh periodically to get the latest positions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+  </main>
+
+  <!-- ═══ ADD WALLET MODAL ══════════════════════════════════════════════════ -->
+
+  <div id="addModal" class="fixed inset-0 z-50 flex items-center justify-center hidden" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);">
+    <div class="glass rounded-xl p-6 w-full max-w-md mx-4 slide-in">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="syne text-lg font-bold">Track New Wallet</h2>
+        <button onclick="closeAddModal()" class="text-xl" style="color: var(--muted);">✕</button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs mb-2" style="color: var(--muted); letter-spacing: 0.1em;">WALLET ADDRESS *</label>
+          <input id="modalAddress" type="text" class="input-field w-full" placeholder="0x..." />
+        </div>
+        <div>
+          <label class="block text-xs mb-2" style="color: var(--muted); letter-spacing: 0.1em;">LABEL (OPTIONAL)</label>
+          <input id="modalLabel" type="text" class="input-field w-full" placeholder="Whale #1, Smart Bettor..." />
+        </div>
+        <button onclick="addWalletModal()" class="glow-btn w-full py-3 rounded text-sm">
+          START TRACKING →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ POSITIONS DRAWER ══════════════════════════════════════════════════ -->
+
+  <div id="drawerOverlay" class="fixed inset-0 z-40 hidden" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);" onclick="closeDrawer()"></div>
+  <div id="positionsDrawer" class="fixed right-0 top-0 bottom-0 z-50 w-full max-w-xl overflow-y-auto transition-transform duration-300 translate-x-full" style="background: var(--surface); border-left: 1px solid var(--border);">
+    <div class="sticky top-0 z-10 flex items-center justify-between px-5 py-4" style="background: var(--surface); border-bottom: 1px solid var(--border);">
+      <div>
+        <h2 class="syne font-bold" id="drawerTitle">Positions</h2>
+        <p class="text-xs mt-0.5" id="drawerAddress" style="color: var(--muted);"></p>
+      </div>
+      <button onclick="closeDrawer()" class="text-xl" style="color: var(--muted);">✕</button>
+    </div>
+    <div id="drawerPositions" class="p-4 space-y-3"></div>
+  </div>
+
+  <!-- Toast container -->
+
+  <div id="toastContainer"></div>
+
+  <script>
+    const API = '';  // same origin
+
+    // ─── State ──────────────────────────────────────────────────────────────
+    let wallets = [];
+    let activeTab = 'leaderboard';
+
+    // ─── Init ────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      loadLeaderboard();
+      loadSummary();
+      setInterval(() => { loadLeaderboard(); loadSummary(); }, 30000);
+    });
+
+    // ─── Tabs ────────────────────────────────────────────────────────────────
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.remove('hidden');
+      btn.classList.add('active');
+      activeTab = name;
+      if (name === 'positions') loadPositions();
+    }
+
+    // ─── API ─────────────────────────────────────────────────────────────────
+    async function apiFetch(url, options = {}) {
+      const res = await fetch(API + url, options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ─── Leaderboard ─────────────────────────────────────────────────────────
+    async function loadLeaderboard() {
+      try {
+        wallets = await apiFetch('/api/leaderboard');
+        renderLeaderboard(wallets);
+        updateWalletFilter(wallets);
+      } catch (e) {
+        console.error('Leaderboard load failed:', e);
+      }
+    }
+
+    function renderLeaderboard(data) {
+      const body = document.getElementById('leaderboardBody');
+      if (!data.length) {
+        body.innerHTML = `
+          <div class="py-12 text-center text-xs" style="color: var(--muted);">
+            <p class="text-3xl mb-3">🎯</p>
+            <p style="letter-spacing: 0.1em;">NO WALLETS TRACKED YET</p>
+            <p class="mt-1">Add a wallet above to start tracking smart money</p>
+          </div>`;
+        return;
+      }
+
+      body.innerHTML = data.map((w, i) => {
+        const rank = i + 1;
+        const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
+        const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+        const pnl = Number(w.total_profit || 0);
+        const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+        const pnlStr = (pnl >= 0 ? '+' : '') + formatNum(pnl);
+        const winRate = Number(w.win_rate || 0);
+        const shortAddr = w.address.slice(0, 6) + '…' + w.address.slice(-4);
+        const updated = w.last_updated ? timeAgo(w.last_updated) : 'never';
+
+        return `
+          <div class="wallet-row" onclick="openPositionsDrawer('${w.address}', '${escHtml(w.label)}')">
+            <div class="px-5 py-3 hidden md:grid items-center gap-4 text-sm"
+              style="grid-template-columns: 40px 1fr 120px 100px 100px 120px 80px;">
+
+              <span class="text-sm ${rankClass} font-bold">${rankIcon}</span>
+
+              <div>
+                <p class="font-bold text-sm" style="color: var(--text);">${escHtml(w.label)}</p>
+                <p class="text-xs mt-0.5 font-mono" style="color: var(--muted);">${shortAddr}</p>
+                <div class="win-bar mt-1.5 w-24">
+                  <div class="win-bar-fill" style="width: ${Math.min(winRate, 100)}%"></div>
+                </div>
+              </div>
+
+              <span class="text-right font-bold ${pnlClass}">${pnlStr}</span>
+
+              <div class="text-right">
+                <span class="${winRate >= 55 ? 'profit' : winRate >= 45 ? 'neutral' : 'loss'} font-bold">${winRate.toFixed(1)}%</span>
+              </div>
+
+              <div class="text-right text-xs" style="color: var(--muted);">
+                <span class="profit">${w.wins || 0}W</span> / <span class="loss">${w.losses || 0}L</span>
+              </div>
+
+              <span class="text-right text-xs" style="color: var(--muted);">${formatNum(w.volume_traded || 0)}</span>
+
+              <div class="text-right flex items-center justify-end gap-2">
+                <button onclick="event.stopPropagation(); refreshWallet('${w.address}')"
+                  class="text-xs px-2 py-0.5 rounded" style="border: 1px solid var(--border); color: var(--muted);">↻</button>
+                <button onclick="event.stopPropagation(); removeWallet('${w.address}')"
+                  class="text-xs px-2 py-0.5 rounded" style="border: 1px solid rgba(255,59,92,0.2); color: var(--red);">✕</button>
+              </div>
+            </div>
+
+            <!-- Mobile row -->
+            <div class="md:hidden px-4 py-3 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-lg ${rankClass}">${rankIcon}</span>
+                <div>
+                  <p class="text-sm font-bold">${escHtml(w.label)}</p>
+                  <p class="text-xs" style="color: var(--muted);">${shortAddr}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="font-bold ${pnlClass}">${pnlStr}</p>
+                <p class="text-xs mt-0.5 ${winRate >= 50 ? 'profit' : 'loss'}">${winRate.toFixed(1)}% WR</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── Summary ──────────────────────────────────────────────────────────────
+    async function loadSummary() {
+      try {
+        const s = await apiFetch('/api/stats/summary');
+        const pnl = Number(s.combined_profit || 0);
+        const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+
+        setText('sumWallets', s.total_wallets || '0');
+        setHtml('sumPnl', `<span class="${pnlClass}">${(pnl >= 0 ? '+' : '') + formatNum(pnl)}</span>`);
+        setText('sumWinRate', (Number(s.avg_win_rate || 0)).toFixed(1) + '%');
+        setText('sumTop', (Number(s.top_profit || 0) >= 0 ? '+' : '') + formatNum(s.top_profit || 0));
+
+        // Header
+        setText('hdrWallets', s.total_wallets || '0');
+        setHtml('hdrPnl', `<span class="${pnlClass}">${(pnl >= 0 ? '+' : '') + formatNum(pnl)}</span>`);
+        setText('hdrWinRate', (Number(s.avg_win_rate || 0)).toFixed(1) + '%');
+        document.getElementById('headerStats').classList.remove('hidden');
+      } catch (e) {}
+    }
+
+    // ─── Positions ────────────────────────────────────────────────────────────
+    function updateWalletFilter(wallets) {
+      const sel = document.getElementById('walletFilter');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">All Wallets</option>' +
+        wallets.map(w => `<option value="${w.address}" ${w.address === cur ? 'selected' : ''}>${escHtml(w.label)}</option>`).join('');
+    }
+
+    async function loadPositions() {
+      const address = document.getElementById('walletFilter').value;
+      const body = document.getElementById('positionsBody');
+      body.innerHTML = `<div class="col-span-full py-8 text-center text-xs loading-dots" style="color: var(--muted);">Loading positions</div>`;
+
+      try {
+        const url = address ? `/api/wallets/${address}/positions` : '/api/leaderboard';
+        let positions = [];
+        if (address) {
+          positions = await apiFetch(url);
+        } else {
+          // Aggregate from all wallets
+          const allWallets = await apiFetch('/api/wallets');
+          const allPos = await Promise.allSettled(
+            allWallets.map(w => apiFetch(`/api/wallets/${w.address}/positions`))
+          );
+          positions = allPos.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+        }
+
+        if (!positions.length) {
+          body.innerHTML = `<div class="col-span-full py-8 text-center text-xs" style="color: var(--muted);">No positions found</div>`;
+          return;
+        }
+
+        body.innerHTML = positions.map(pos => renderPositionCard(pos)).join('');
+      } catch (e) {
+        body.innerHTML = `<div class="col-span-full py-4 text-center text-xs" style="color: var(--red);">Failed to load positions</div>`;
+      }
+    }
+
+    function renderPositionCard(pos) {
+      const pnl = Number(pos.pnl || 0);
+      const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+      const isActive = pos.status === 'ACTIVE';
+      const price = Number(pos.current_price || 0);
+      const priceStr = (price * 100).toFixed(0) + '¢';
+
+      return `
+        <div class="position-card slide-in">
+          <div class="flex items-start justify-between mb-2">
+            <span class="text-xs px-2 py-0.5 rounded" style="background: rgba(${isActive ? '0,255,135' : '255,59,92'},0.1); color: var(${isActive ? '--green' : '--red'}); border: 1px solid rgba(${isActive ? '0,255,135' : '255,59,92'},0.2);">
+              ${isActive ? '● ACTIVE' : '✓ RESOLVED'}
+            </span>
+            <span class="text-xs font-bold ${pnlClass}">${pnl >= 0 ? '+' : ''}${formatNum(pnl)}</span>
+          </div>
+          <p class="text-sm font-bold leading-snug mb-3" style="color: var(--text);">${escHtml(pos.market_question || 'Unknown Market')}</p>
+          <div class="grid grid-cols-3 gap-2 text-xs" style="color: var(--muted);">
+            <div>
+              <p>SIZE</p>
+              <p class="font-bold mt-0.5" style="color: var(--text);">${Number(pos.size || 0).toFixed(2)}</p>
+            </div>
+            <div>
+              <p>AVG PRICE</p>
+              <p class="font-bold mt-0.5" style="color: var(--text);">${(Number(pos.avg_price || 0) * 100).toFixed(0)}¢</p>
+            </div>
+            <div>
+              <p>CUR PRICE</p>
+              <p class="font-bold mt-0.5 ${isActive ? (price > Number(pos.avg_price || 0) ? 'profit' : 'loss') : ''}">${priceStr}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ─── Positions Drawer ─────────────────────────────────────────────────────
+    async function openPositionsDrawer(address, label) {
+      document.getElementById('drawerTitle').textContent = label || 'Positions';
+      document.getElementById('drawerAddress').textContent = address;
+      document.getElementById('drawerOverlay').classList.remove('hidden');
+      document.getElementById('positionsDrawer').classList.remove('translate-x-full');
+
+      const body = document.getElementById('drawerPositions');
+      body.innerHTML = `<div class="py-8 text-center text-xs loading-dots" style="color: var(--muted);">Fetching positions</div>`;
+
+      try {
+        const positions = await apiFetch(`/api/wallets/${address}/positions`);
+        if (!positions.length) {
+          body.innerHTML = `<div class="py-8 text-center text-xs" style="color: var(--muted);">No positions found.<br>Try refreshing this wallet first.</div>`;
+          return;
+        }
+        body.innerHTML = positions.map(renderPositionCard).join('');
+      } catch (e) {
+        body.innerHTML = `<div class="py-4 text-center text-xs" style="color: var(--red);">Failed to load positions</div>`;
+      }
+    }
+
+    function closeDrawer() {
+      document.getElementById('positionsDrawer').classList.add('translate-x-full');
+      document.getElementById('drawerOverlay').classList.add('hidden');
+    }
+
+    // ─── Add / Remove Wallet ──────────────────────────────────────────────────
+    function openAddModal() {
+      document.getElementById('addModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('modalAddress').focus(), 100);
+    }
+    function closeAddModal() {
+      document.getElementById('addModal').classList.add('hidden');
+    }
+
+    async function addWallet() {
+      const address = document.getElementById('addAddress').value.trim();
+      const label = document.getElementById('addLabel').value.trim();
+      await doAddWallet(address, label, 'addAddress');
+    }
+
+    async function addWalletModal() {
+      const address = document.getElementById('modalAddress').value.trim();
+      const label = document.getElementById('modalLabel').value.trim();
+      await doAddWallet(address, label, 'modalAddress', true);
+    }
+
+    async function doAddWallet(address, label, inputId, closeModal = false) {
+      if (!address) return showToast('Please enter a wallet address', 'error');
+      try {
+        await apiFetch('/api/wallets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, label })
+        });
+        showToast(`Tracking ${address.slice(0,6)}…${address.slice(-4)} — fetching data...`, 'success');
+        document.getElementById(inputId).value = '';
+        if (closeModal) {
+          closeAddModal();
+          document.getElementById('modalLabel').value = '';
+        }
+        setTimeout(() => { loadLeaderboard(); loadSummary(); }, 3000);
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function removeWallet(address) {
+      if (!confirm(`Remove wallet ${address.slice(0,6)}…?`)) return;
+      try {
+        await apiFetch(`/api/wallets/${address}`, { method: 'DELETE' });
+        showToast('Wallet removed', 'success');
+        loadLeaderboard();
+        loadSummary();
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function refreshWallet(address) {
+      try {
+        await apiFetch(`/api/wallets/${address}/refresh`, { method: 'POST' });
+        showToast('Refresh queued...', 'success');
+        setTimeout(() => loadLeaderboard(), 5000);
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function refreshAll() {
+      const addrs = wallets.map(w => w.address);
+      if (!addrs.length) return showToast('No wallets to refresh', 'error');
+      await Promise.allSettled(addrs.map(a => apiFetch(`/api/wallets/${a}/refresh`, { method: 'POST' })));
+      showToast(`Refreshing ${addrs.length} wallets...`, 'success');
+      setTimeout(() => { loadLeaderboard(); loadSummary(); }, 8000);
+    }
+
+    // ─── Utils ────────────────────────────────────────────────────────────────
+    function formatNum(n) {
+      const num = Number(n) || 0;
+      if (Math.abs(num) >= 1000) return '$' + (num / 1000).toFixed(2) + 'k';
+      return '$' + num.toFixed(2);
+    }
+
+    function timeAgo(iso) {
+      const d = new Date(iso);
+      const secs = Math.floor((Date.now() - d) / 1000);
+      if (secs < 60) return `${secs}s ago`;
+      if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+      if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+      return `${Math.floor(secs / 86400)}d ago`;
+    }
+
+    function escHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+    function setHtml(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = val;
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      document.getElementById('toastContainer').appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeDrawer(); closeAddModal(); }
+    });
+  </script>
+
+</body>
+</html>
